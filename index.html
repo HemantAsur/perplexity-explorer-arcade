@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perplexity Arcade — How Surprised Is the Model?</title>
+<!-- Neon Arcade edition: a synthwave sunset arcade for perplexity.
+     One file, no frameworks, no backend, no API key.
+     Real DistilGPT-2 runs in your browser (Transformers.js CDN).
+     Everything else (simulator, showdown, guess game) works offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky1:#12042b; --sky2:#2a0a4a; --sky3:#4a1042;
+    --pink:#ff2975; --orange:#ff7b00; --yellow:#ffd319;
+    --cyan:#22d3ee; --lime:#39ff88;
+    --ink:#f5f0ff; --muted:#c9b8e8;
+    --card:rgba(24,8,48,.88); --card2:rgba(38,14,74,.9);
+    --line:rgba(255,41,117,.45); --line2:rgba(34,211,238,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; color:var(--ink);
+    font-family:'Rajdhani',system-ui,-apple-system,'Segoe UI',sans-serif;
+    background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 42%,var(--sky3) 68%,var(--sky1) 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:0 18px 90px}
+  h1,h2,h3{font-family:'Orbitron','Arial Black',sans-serif;letter-spacing:.04em}
+  h1{font-size:clamp(38px,7vw,64px);line-height:1.02;margin:10px 0 6px;text-align:center;
+     text-shadow:0 0 18px rgba(255,41,117,.75),0 0 46px rgba(255,123,0,.45)}
+  h1 .a{color:var(--cyan)} h1 .b{color:var(--yellow)}
+  h2{font-size:22px;color:var(--cyan);margin:0 0 6px;
+     text-shadow:0 0 12px rgba(34,211,238,.6)}
+  h3{font-size:16px;color:var(--yellow);margin:14px 0 6px}
+  p{font-size:18px;line-height:1.5;margin:8px 0}
+  .muted{color:var(--muted)}
+  .tag{text-align:center;color:var(--yellow);font-weight:700;letter-spacing:.22em;
+       font-size:13px;text-transform:uppercase}
+  .sub{text-align:center;color:var(--muted);font-size:19px;max-width:640px;margin:6px auto 0}
+  /* --- synthwave sun + grid --- */
+  .scene{position:relative;height:270px;overflow:hidden;border-radius:0 0 24px 24px;margin-bottom:8px}
+  .sun{position:absolute;left:50%;top:18px;transform:translateX(-50%);
+       width:210px;height:210px;border-radius:50%;overflow:hidden;
+       background:linear-gradient(180deg,var(--yellow) 0%,var(--pink) 55%,var(--orange) 100%);
+       box-shadow:0 0 70px rgba(255,41,117,.65),0 0 140px rgba(255,123,0,.35)}
+  .sun::after{content:"";position:absolute;inset:0;
+       background:repeating-linear-gradient(180deg,transparent 0 16px,rgba(18,4,43,.85) 16px 21px)}
+  .gridfloor{position:absolute;left:-10%;right:-10%;bottom:-6px;height:110px;
+       background-image:linear-gradient(rgba(34,211,238,.55) 1px,transparent 1px),
+                        linear-gradient(90deg,rgba(34,211,238,.55) 1px,transparent 1px);
+       background-size:44px 34px;
+       transform:perspective(320px) rotateX(62deg);transform-origin:top;
+       animation:gridmove 1.6s linear infinite;
+       -webkit-mask-image:linear-gradient(180deg,transparent,#000 30%);
+       mask-image:linear-gradient(180deg,transparent,#000 30%)}
+  @keyframes gridmove{from{background-position:0 0}to{background-position:0 34px}}
+  /* --- cards --- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:20px 22px;margin:22px 0;
+        box-shadow:0 0 0 1px rgba(34,211,238,.07),0 10px 40px rgba(0,0,0,.45)}
+  .card.cyan{border-color:var(--line2)}
+  .kicker{font-size:13px;font-weight:700;letter-spacing:.2em;color:var(--pink);
+          text-transform:uppercase}
+  /* --- controls --- */
+  input[type=text],textarea{width:100%;padding:12px 14px;font-size:18px;color:var(--ink);
+    font-family:'Rajdhani',system-ui,sans-serif;font-weight:600;
+    background:rgba(10,2,26,.8);border:1px solid var(--line2);border-radius:10px;outline:none}
+  input[type=text]:focus,textarea:focus{border-color:var(--cyan);
+    box-shadow:0 0 0 3px rgba(34,211,238,.25)}
+  button{cursor:pointer;font-family:'Orbitron','Arial Black',sans-serif}
+  .btn{border:none;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:800;
+       color:#fff;background:linear-gradient(90deg,var(--pink),var(--orange));
+       box-shadow:0 4px 22px rgba(255,41,117,.45);margin:6px 6px 6px 0}
+  .btn:hover{filter:brightness(1.12)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+  .btn.ghost{background:transparent;color:var(--cyan);border:1px solid var(--cyan);box-shadow:none}
+  .btn.ghost:hover{background:rgba(34,211,238,.12)}
+  .pill{display:inline-block;border:1px solid var(--line2);border-radius:999px;
+        padding:7px 14px;margin:4px 6px 4px 0;background:rgba(10,2,26,.6);
+        color:var(--ink);font-family:'Rajdhani',system-ui,sans-serif;font-size:16px;font-weight:700}
+  .pill:hover{border-color:var(--cyan);background:rgba(34,211,238,.14)}
+  .status{font-size:16px;min-height:24px;margin:10px 0 0}
+  .status.err{color:#ff5c7a;font-weight:700}
+  .status.ok{color:var(--lime);font-weight:700}
+  /* --- results --- */
+  .bigpp{font-family:'Orbitron','Arial Black',sans-serif;font-size:64px;font-weight:800;
+         color:var(--pink);line-height:1;margin:6px 0;
+         text-shadow:0 0 22px rgba(255,41,117,.8)}
+  .badge{display:inline-block;padding:5px 14px;border-radius:999px;font-weight:800;
+         font-size:15px;letter-spacing:.06em;margin:6px 0}
+  .badge.good{background:rgba(57,255,136,.16);color:var(--lime);border:1px solid var(--lime)}
+  .badge.mid{background:rgba(255,211,25,.14);color:var(--yellow);border:1px solid var(--yellow)}
+  .badge.bad{background:rgba(255,59,92,.16);color:#ff5c7a;border:1px solid #ff5c7a}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .chip{padding:6px 12px;border-radius:999px;font-family:'JetBrains Mono',ui-monospace,monospace;
+        font-size:15px;background:rgba(10,2,26,.8);border:1px solid}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:16px}
+  th,td{padding:8px 8px;text-align:left;border-bottom:1px solid rgba(201,184,232,.18)}
+  th{color:var(--muted);font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+  td.num,td .num{font-family:'JetBrains Mono',ui-monospace,monospace}
+  .bar{height:10px;border-radius:99px;background:linear-gradient(90deg,var(--cyan),var(--pink));
+       min-width:2px}
+  .barwrap{width:130px;background:rgba(201,184,232,.14);border-radius:99px}
+  .steps{background:rgba(10,2,26,.7);border:1px dashed var(--line2);border-radius:12px;
+         padding:12px 16px;font-family:'JetBrains Mono',ui-monospace,monospace;
+         font-size:15px;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  .why{border-left:4px solid var(--yellow);padding:8px 12px;margin:12px 0;
+       background:rgba(255,211,25,.08);font-size:17px}
+  .gauge{height:12px;border-radius:99px;margin:10px 0 4px;
+         background:linear-gradient(90deg,var(--lime),var(--yellow) 45%,var(--pink) 80%,#ff3b5c)}
+  .gaugemark{font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+  canvas{width:100%;height:180px;display:block}
+  /* --- showdown / guess --- */
+  .vs{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:start}
+  .vs .mid{align-self:center;text-align:center;font-family:'Orbitron',sans-serif;
+           font-size:26px;color:var(--yellow);text-shadow:0 0 14px rgba(255,211,25,.7)}
+  .winner{font-family:'Orbitron',sans-serif;font-size:20px;color:var(--lime);
+          text-align:center;margin:12px 0;text-shadow:0 0 14px rgba(57,255,136,.7)}
+  .score{font-family:'Orbitron',sans-serif;font-size:18px;color:var(--yellow)}
+  .rangebtn{flex:1}
+  .ranges{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .ranges .btn{flex:1;min-width:110px;text-align:center}
+  /* --- simulator --- */
+  .simrow{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
+  .simrow input[type=text]{flex:1;min-width:110px}
+  .simrow input[type=number]{width:92px;padding:10px;font-size:16px;color:var(--ink);
+    background:rgba(10,2,26,.8);border:1px solid var(--line2);border-radius:10px;
+    font-family:'JetBrains Mono',ui-monospace,monospace}
+  .simrow input[type=range]{flex:2;min-width:120px;accent-color:var(--pink)}
+  .xbtn{background:none;border:1px solid #ff5c7a;color:#ff5c7a;border-radius:50%;
+        width:30px;height:30px;font-size:15px;padding:0}
+  /* --- learn / faq --- */
+  .mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .mini .m{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px}
+  .mini .m b{color:var(--yellow)}
+  details{background:var(--card2);border:1px solid var(--line2);border-radius:12px;
+          padding:12px 16px;margin:10px 0}
+  details summary{cursor:pointer;font-weight:700;font-size:18px;color:var(--cyan)}
+  details p{margin:8px 0 2px}
+  /* --- present mode --- */
+  #presentBtn{position:fixed;right:16px;bottom:16px;z-index:50}
+  #presentBar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:51;
+    display:none;max-width:92vw;width:640px;background:var(--card2);
+    border:1px solid var(--cyan);border-radius:14px;padding:12px 16px;
+    box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  #presentBar.on{display:block}
+  .tour-hl{outline:3px solid var(--yellow) !important;outline-offset:4px;
+           box-shadow:0 0 30px rgba(255,211,25,.5) !important}
+  /* --- high scores + target practice --- */
+  .scores{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .scores ul{list-style:none;padding:0;margin:6px 0}
+  .scores li{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;
+    background:rgba(10,2,26,.7);border:1px solid rgba(201,184,232,.18);
+    border-radius:8px;margin:5px 0;font-size:16px}
+  .scores li b{font-family:'JetBrains Mono',ui-monospace,monospace}
+  .meter{position:relative;height:16px;border-radius:99px;margin:14px 0 4px;
+    background:linear-gradient(90deg,var(--lime),var(--yellow) 45%,var(--pink) 80%,#ff3b5c)}
+  .meter .band{position:absolute;top:-4px;bottom:-4px;background:rgba(255,255,255,.28);
+    border:1px solid #fff;border-radius:99px}
+  .meter .mark{position:absolute;top:-8px;font-size:20px;transform:translateX(-50%)}
+  .meterlabels{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+  @media (max-width:640px){ .scores{grid-template-columns:1fr} }
+  .hidden{display:none !important}
+  footer{color:var(--muted);text-align:center;font-size:15px;margin-top:34px}
+  @media (max-width:640px){ .vs{grid-template-columns:1fr} .vs .mid{display:none} .bigpp{font-size:48px} }
+</style>
+</head>
+<body>
+
+<div class="scene">
+  <div class="sun"></div>
+  <div class="gridfloor"></div>
+</div>
+
+<div class="wrap">
+  <p class="tag">✦ Neon Arcade Edition ✦</p>
+  <h1 id="heroTitle"><span class="a">PERPLEXITY</span> <span class="b">ARCADE</span></h1>
+  <p class="sub">How surprised is the model? Step right up, type a sentence, and watch a real
+  language model — DistilGPT-2, running in your browser — place its bets on every word.</p>
+
+  <div style="text-align:center;margin:16px 0">
+    <button class="pill sample" data-s="I love Python">I love Python</button>
+    <button class="pill sample" data-s="Python love I">Python love I</button>
+    <button class="pill sample" data-s="The capital of France is Paris">The capital of France is Paris</button>
+    <button class="pill" id="surpriseBtn">🎲 Surprise Me</button>
+    <div class="muted" id="surpriseNote" style="font-size:15px;margin-top:6px"></div>
+  </div>
+
+  <!-- ============ SECTION 1 · LIVE MODEL LAB ============ -->
+  <div class="card" id="labCard">
+    <div class="kicker">01 · Live Model Lab</div>
+    <h2>Score a sentence with the real model</h2>
+    <p>DistilGPT-2 reads your sentence and gives every token a probability.
+    Perplexity is the geometric mean of 1/P over all tokens — low means "seen this a
+    thousand times", high means "never in a million years".</p>
+    <input type="text" id="sentence" value="I love Python" autocomplete="off"
+           placeholder="Type a sentence…">
+    <div>
+      <button class="btn" id="runBtn">▶ Calculate perplexity</button>
+      <span class="muted" style="font-size:15px">Model loads once (~80&nbsp;MB), then it is instant.
+      After that, scoring happens live as you type.</span>
+    </div>
+    <div class="status" id="status">Model not loaded yet — press Calculate.</div>
+    <div id="realCard" class="hidden">
+      <div id="realOut"></div>
+    </div>
+    <div id="nextCard" class="hidden">
+      <h3>🔮 What could come next? — top 8 predictions</h3>
+      <div id="nextOut"></div>
+    </div>
+  </div>
+
+  <!-- ============ SURPRISE SKYLINE (working canvas chart) ============ -->
+  <div class="card cyan" id="skyCard">
+    <div class="kicker">The Surprise Skyline</div>
+    <h2>Every token is a building — taller means more shocking</h2>
+    <p class="muted">Bar height is log₁₀(1/P): a token the model barely expected towers over the rest.
+    This chart is drawn live from your real result — no fake 3D, no empty panels.</p>
+    <canvas id="skyline" width="860" height="180"></canvas>
+    <p class="muted" id="skyNote" style="font-size:15px">Score a sentence above and the skyline lights up here.</p>
+  </div>
+
+  <!-- ============ ARCADE HIGH SCORES ============ -->
+  <div class="card" id="scoresCard">
+    <div class="kicker">🏆 Arcade High Scores</div>
+    <h2>Every sentence you score goes on the board</h2>
+    <p class="muted">Lowest perplexity wins the Hall of Fame; wildest takes the Hall of Shame.
+    Scores are saved in your browser, so they survive a refresh. <span id="scoreCount"></span></p>
+    <div class="scores">
+      <div>
+        <h3>😇 Hall of Fame — smoothest</h3>
+        <ul id="fameList"><li>No scores yet — go score a sentence above.</li></ul>
+      </div>
+      <div>
+        <h3>😈 Hall of Shame — wildest</h3>
+        <ul id="shameList"><li>No scores yet — try “Python love I”.</li></ul>
+      </div>
+    </div>
+    <button class="btn ghost" id="clearScoresBtn">🗑️ Clear the board</button>
+  </div>
+
+  <!-- ============ SECTION 2 · SENTENCE SHOWDOWN ============ -->
+  <div class="card" id="showCard">
+    <div class="kicker">02 · Sentence Showdown</div>
+    <h2>Two sentences enter. One perplexity leaves.</h2>
+    <p>The same model scores both. Lower perplexity wins — it is the sentence the model
+    finds more natural.</p>
+    <div class="vs">
+      <div>
+        <label class="muted" for="sA">Sentence A</label>
+        <input type="text" id="sA" value="The cat sat on the mat">
+      </div>
+      <div class="mid">VS</div>
+      <div>
+        <label class="muted" for="sB">Sentence B</label>
+        <input type="text" id="sB" value="The cat sat on the banana">
+      </div>
+    </div>
+    <button class="btn" id="showBtn">⚔️ Run the showdown</button>
+    <div class="status" id="showStatus"></div>
+    <div id="showOut"></div>
+  </div>
+
+  <!-- ============ SECTION 3 · GUESS THE PERPLEXITY ============ -->
+  <div class="card cyan" id="guessCard">
+    <div class="kicker">03 · Guess the Perplexity</div>
+    <h2>Can you feel surprise before the model does?</h2>
+    <p>A sentence appears. Guess which range its perplexity falls in — then the real model
+    reveals the answer. <span class="score" id="guessScore">Score: 0 / 0</span></p>
+    <p style="font-size:21px;font-weight:700" id="guessSentence">Press “New sentence” to start.</p>
+    <button class="btn" id="guessNewBtn">🎲 New sentence</button>
+    <div class="ranges">
+      <button class="btn ghost rangebtn guess-range" data-r="0">PP 1 – 2</button>
+      <button class="btn ghost rangebtn guess-range" data-r="1">PP 2 – 5</button>
+      <button class="btn ghost rangebtn guess-range" data-r="2">PP 5 – 20</button>
+      <button class="btn ghost rangebtn guess-range" data-r="3">PP 20+</button>
+    </div>
+    <div class="status" id="guessStatus">Pick a range after a sentence appears.</div>
+    <div id="guessOut"></div>
+  </div>
+
+  <!-- ============ SECTION 4 · TARGET PRACTICE ============ -->
+  <div class="card" id="targetCard">
+    <div class="kicker">04 · Target Practice</div>
+    <h2>Hit the band. Win the round.</h2>
+    <p>Your target: <b style="color:var(--yellow)" id="targetBand">PP 20 – 100</b>
+    <span class="score" id="targetScore">🎯 Targets hit: 0</span></p>
+    <p class="muted">Type a sentence and land its perplexity inside the target band. Too smooth and
+    you're under; too wild and you're over. Each “Score it” is one attempt — the meter shows
+    where you landed on a log scale from 1 to 10,000.</p>
+    <input type="text" id="targetInput" value="The quick brown fox jumps over the lazy dog" autocomplete="off"
+           placeholder="Type a sentence to hit the target…">
+    <div class="meter"><div class="band" id="targetBandMark"></div><div class="mark" id="targetMark" style="left:50%">▼</div></div>
+    <div class="meterlabels"><span>1</span><span>10</span><span>100</span><span>1000</span><span>10000</span></div>
+    <div class="status" id="targetVerdict">Press “New target” or just hit “Score it” — the model scores it for real.</div>
+    <div>
+      <button class="btn" id="targetBtn">🎯 Score it</button>
+      <button class="btn ghost" id="targetNewBtn">🎲 New target</button>
+    </div>
+  </div>
+
+  <!-- ============ SECTION 4 · TRY IT BY HAND (SIMULATOR) ============ -->
+  <div class="card" id="simCard">
+    <div class="kicker">05 · Try It by Hand — Simulator</div>
+    <h2>Be the model. Set the probabilities yourself.</h2>
+    <p><b style="color:var(--yellow)">Simulated, not from the model.</b> Drag the sliders or type
+    exact probabilities and watch perplexity move live. This is how the maths works —
+    no model needed, so it works even offline.</p>
+    <div>
+      <button class="pill sim-preset" data-p="python">I love Python</button>
+      <button class="pill sim-preset" data-p="eights">All 1/8</button>
+      <button class="pill sim-preset" data-p="surprise">One surprising word</button>
+      <button class="pill" id="addSimBtn">+ Add token</button>
+    </div>
+    <div id="simRows"></div>
+    <div id="simOut"></div>
+  </div>
+
+  <!-- ============ SECTION 5 · HOW IT WORKS ============ -->
+  <div class="card cyan" id="howCard">
+    <div class="kicker">06 · How Perplexity Works</div>
+    <h2>The maths, in plain English</h2>
+    <div class="mini">
+      <div class="m"><b>🎲 The Weighted Die</b><br>
+        A fair 6-sided die has perplexity exactly 6 — every face is equally likely.
+        Rig the die so one face comes up almost always, and perplexity shrinks toward 1.
+        Perplexity is "how many faces is this die effectively rolling?"</div>
+      <div class="m"><b>🔍 Why 1/P?</b><br>
+        If something has a 99% chance, 1 / 0.99 ≈ 1.01 — zero shock.
+        If a 0.1% chance event happens, 1 / 0.001 = 1,000 — a thousand times the surprise.
+        Inverting the probability turns "how likely" into "how shocking".</div>
+      <div class="m"><b>📐 The N-th Root</b><br>
+        Multiplying ten probabilities makes an astronomically tiny number.
+        Taking the N-th root (the geometric mean) normalises by sentence length, so a
+        3-word sentence and a 30-word sentence can be fairly compared.</div>
+      <div class="m"><b>🧮 Cross-entropy</b><br>
+        Average surprise in bits: H = −(log₂P₁ + … + log₂Pₙ) / N.
+        And the neat identity: <b>perplexity = 2^H</b>. Same number, two languages.</div>
+    </div>
+    <h3>Core glossary</h3>
+    <div class="mini">
+      <div class="m"><b>Token</b><br>The atomic fragment of language the model sees — a word,
+        a subword, or punctuation. GPT-2's vocabulary has 50,257 tokens.</div>
+      <div class="m"><b>Log-softmax</b><br>The model's raw scores are turned into probabilities
+        in log space, because exponentiating raw numbers can overflow. Stable maths,
+        same answers.</div>
+      <div class="m"><b>Start token 50256</b><br>The GPT-2 &lt;|endoftext|&gt; symbol. We put it
+        in front so the very first word gets a real probability too.</div>
+      <div class="m"><b>Surprise (bits)</b><br>−log₂P: how many yes/no questions the word was
+        "worth". A word with P = 1/8 carries exactly 3 bits of surprise.</div>
+    </div>
+    <h3>Questions, answered</h3>
+    <details>
+      <summary>Why does “Python love I” score so much higher than “I love Python”?</summary>
+      <p>Same words, different order. DistilGPT-2 learned English word order from millions of
+      documents, so a scrambled sentence breaks its expectations — the final word gets an
+      extremely low probability, and one tiny P drags the whole average up.</p>
+    </details>
+    <details>
+      <summary>Does my sentence leave my computer?</summary>
+      <p>No. The model weights and the tokenizer download once into your browser, and every
+      calculation happens on your machine. Nothing you type is sent anywhere.</p>
+    </details>
+    <details>
+      <summary>What does a perplexity of 8 mean?</summary>
+      <p>On average, the model was as unsure as rolling an 8-sided die — as if it were
+      choosing at random between 8 equally likely words at every step.</p>
+    </details>
+    <details>
+      <summary>Why is the real model's number so much bigger than the simulator's 2.32?</summary>
+      <p>The simulator uses friendly made-up probabilities like 0.5 and 0.8. The real model
+      scores real words — and it is brutally honest: in “I love Python” it gives “Python”
+      a probability of about 0.00006, which alone multiplies the perplexity by 15,650.
+      Toy numbers are kind; reality is not.</p>
+    </details>
+  </div>
+
+  <footer>
+    Perplexity Arcade · Neon Arcade Edition · Real model: DistilGPT-2 (q8) via Transformers.js ·
+    Built as one file, no backend · Press 🎤 Present to tour it
+  </footer>
+</div>
+
+<!-- Present mode -->
+<button class="btn" id="presentBtn">🎤 Present</button>
+<div id="presentBar">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <b id="presentCount" style="color:var(--yellow)">Stop 1 / 9</b>
+    <button class="xbtn" id="tourExit" title="Exit tour">✕</button>
+  </div>
+  <p id="presentNote" style="margin:8px 0"></p>
+  <div>
+    <button class="btn ghost" id="tourPrev">← Prev</button>
+    <button class="btn" id="tourNext">Next →</button>
+  </div>
+</div>
+
+<script>
+// ===== Classic script: always runs, works offline =====
+// Shared helpers, results rendering, skyline chart, simulator,
+// showdown, guess game, surprise-me, live scoring, present mode.
+// The real model lives in the module script below; nothing here
+// needs the network, so the simulator and games keep working
+// even if the model library cannot load.
+function $(id){ return document.getElementById(id); }
+function fmt(x){
+  if (x === 0) return "0";
+  if (!isFinite(x)) return "∞";
+  if (x >= 10000 || x < 0.001) return x.toExponential(2);
+  return String(Number(x.toPrecision(3)));
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function showToken(t){ return t.replace(/ /g, "␣").replace(/\n/g, "↵"); }
+function setStatus(text, isErr){
+  var s = $("status");
+  s.textContent = text;
+  s.className = "status" + (isErr ? " err" : "");
+}
+function colorFor(p){
+  if (p >= 0.7) return "#39ff88";
+  if (p >= 0.3) return "#ffd319";
+  return "#ff5c7a";
+}
+function ppOf(rows){
+  var sum = 0;
+  rows.forEach(function(r){ sum += -Math.log(r.p); });
+  return Math.exp(sum / rows.length);
+}
+function verdictFor(pp){
+  if (pp < 50)  return {label:"SMOOTH RIDE", cls:"good", text:"The model has seen sentences like this a thousand times."};
+  if (pp < 150) return {label:"BUMPY ROAD", cls:"mid",  text:"Mostly expected, with a few words that made the model blink."};
+  return {label:"CHAOS MODE", cls:"bad", text:"The model is properly lost — this sentence surprised it badly."};
+}
+function animatePP(el, target){
+  if (!el) return;
+  function fmtPP(v){ return v < 100 ? v.toFixed(1) : String(Math.round(v)); }
+  if (typeof requestAnimationFrame !== "function"){ el.textContent = fmtPP(target); return; }
+  var start = null, dur = 650;
+  function step(ts){
+    if (!start) start = ts;
+    var k = Math.min(1, (ts - start) / dur);
+    var eased = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmtPP(target * eased);
+    if (k < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+// Shared results block: token chips, table, three steps, gauge, verdict, why-line.
+// rows = [{token, p}]; prefix namespaces the big-number id. Returns {html, pp}.
+function resultsHTML(rows, prefix){
+  var pp = ppOf(rows);
+  var v = verdictFor(pp);
+  var chips = rows.map(function(r){
+    var c = colorFor(r.p);
+    return '<span class="chip" style="color:' + c + ';border-color:' + c + '">' + escapeHtml(showToken(r.token)) + '</span>';
+  }).join("");
+  var sumLog = 0, sumBits = 0;
+  rows.forEach(function(r){ sumLog += -Math.log(r.p); sumBits += -Math.log2(r.p); });
+  var H = sumBits / rows.length;
+  var trs = rows.map(function(r, i){
+    var inv = 1 / r.p;
+    var bits = -Math.log2(r.p);
+    var w = Math.max(2, Math.min(100, Math.log10(inv) / 5 * 100));
+    return '<tr><td class="num">' + (i + 1) + '</td><td>' + escapeHtml(showToken(r.token)) + '</td>' +
+      '<td class="num">' + fmt(r.p) + '</td>' +
+      '<td><div class="barwrap"><div class="bar" style="width:' + w.toFixed(1) + '%"></div></div></td>' +
+      '<td class="num">' + fmt(inv) + '×</td>' +
+      '<td class="num">' + fmt(bits) + '</td></tr>';
+  }).join("");
+  var factors = rows.map(function(r){ return fmt(1 / r.p); });
+  var prodText = factors.slice(0, 10).join(" × ") + (factors.length > 10 ? " × …" : "");
+  var worst = rows[0];
+  rows.forEach(function(r){ if (r.p < worst.p) worst = r; });
+  var pct = Math.max(0, Math.min(100, Math.log10(pp) / 3 * 100));
+  return {html:
+    '<div class="bigpp" id="pp-' + prefix + '">–</div>' +
+    '<span class="badge ' + v.cls + '">' + v.label + '</span>' +
+    '<p style="font-size:19px">The model was as unsure as choosing between about <b>' + Math.round(pp) + '</b> equally likely tokens. ' + v.text + '</p>' +
+    '<div style="position:relative;margin-top:20px"><div style="position:absolute;left:' + pct.toFixed(1) + '%;top:-18px;transform:translateX(-50%);font-size:18px">▼</div>' +
+    '<div class="gauge"></div><div class="gaugemark"><span>1 · obvious</span><span>10</span><span>100</span><span>1000 · chaos</span></div></div>' +
+    '<div class="chips">' + chips + '</div>' +
+    '<table><tr><th>#</th><th>Token</th><th>P</th><th>Shock</th><th>1/P</th><th>Bits</th></tr>' + trs + '</table>' +
+    '<div class="steps">Step 1 · multiply all the 1/P values:\n  ' + prodText + ' = ' + fmt(Math.exp(sumLog)) +
+    '\nStep 2 · N = ' + rows.length + ' tokens' +
+    '\nStep 3 · perplexity = (product)^(1/N) = exp(' + fmt(sumLog) + ' / ' + rows.length + ') = ' + fmt(pp) +
+    '\nCross-entropy H = ' + fmt(H) + ' bits  ·  check: 2^H = ' + fmt(Math.pow(2, H)) +
+    '\n(Computed with logs, so long sentences never overflow.)</div>' +
+    '<div class="why">💡 <b>Why?</b> Biggest shock: “' + escapeHtml(worst.token.trim()) + '” — the model gave it P = ' + fmt(worst.p) +
+    ', so it counts ' + fmt(1 / worst.p) + '× against the average.</div>',
+    pp: pp};
+}
+// ----- Surprise skyline: canvas bars, height = log10(1/P) -----
+function drawSkyline(rows){
+  var cv = $("skyline");
+  if (!cv || !cv.getContext) return;
+  var ctx = cv.getContext("2d");
+  if (!ctx) return;
+  var W = cv.width, H = cv.height;
+  var maxH = 0;
+  rows.forEach(function(r){ var h = Math.log10(1 / r.p); if (h > maxH) maxH = h; });
+  if (maxH <= 0) maxH = 1;
+  var n = rows.length, gap = 10;
+  var bw = Math.max(18, (W - gap * (n + 1)) / n);
+  function draw(k){
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "rgba(34,211,238,.5)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, H - 26); ctx.lineTo(W, H - 26); ctx.stroke();
+    rows.forEach(function(r, i){
+      var h = Math.log10(1 / r.p) / maxH * (H - 60);
+      var x = gap + i * (bw + gap);
+      var y = H - 26 - h * k;
+      var grad = ctx.createLinearGradient(0, y, 0, H - 26);
+      grad.addColorStop(0, colorFor(r.p));
+      grad.addColorStop(1, "rgba(255,41,117,.15)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, bw, Math.max(1, h * k));
+      ctx.fillStyle = "#f5f0ff";
+      ctx.font = "12px monospace";
+      ctx.textAlign = "center";
+      var label = (r.token.trim() || "␣");
+      if (label.length > 10) label = label.slice(0, 9) + "…";
+      ctx.fillText(label, x + bw / 2, H - 10);
+      ctx.fillStyle = colorFor(r.p);
+      ctx.fillText(fmt(1 / r.p) + "×", x + bw / 2, Math.max(14, y - 6));
+    });
+  }
+  if (typeof requestAnimationFrame === "function"){
+    var t0 = null;
+    (function frame(ts){
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / 500);
+      draw(k);
+      if (k < 1) requestAnimationFrame(frame);
+    })(0);
+  } else draw(1);
+  $("skyNote").textContent = "Skyline drawn from your latest result — tallest bar = most surprising token.";
+}
+// ----- Simulator: try it by hand -----
+var simRows = [
+  {name:"I", p:0.5},
+  {name:"love", p:0.8},
+  {name:"Python", p:0.2}
+];
+var SIM_PRESETS = {
+  python: [{name:"I", p:0.5}, {name:"love", p:0.8}, {name:"Python", p:0.2}],
+  eights: ["A","B","C","D","E","F","G","H"].map(function(n){ return {name:n, p:0.125}; }),
+  surprise: [{name:"The", p:0.9}, {name:"cat", p:0.9}, {name:"sat", p:0.9}, {name:"quietly", p:0.01}]
+};
+function renderSimRows(){
+  var host = $("simRows");
+  host.innerHTML = "";
+  simRows.forEach(function(row, i){
+    var div = document.createElement("div");
+    div.className = "simrow";
+    div.innerHTML =
+      '<input type="text" value="' + escapeHtml(row.name) + '" data-i="' + i + '" class="sim-name">' +
+      '<input type="range" min="1" max="99" value="' + Math.round(row.p * 100) + '" data-i="' + i + '" class="sim-range">' +
+      '<input type="number" min="0.01" max="1" step="0.01" value="' + row.p + '" data-i="' + i + '" class="sim-num">' +
+      '<span class="num sim-p" style="min-width:120px">P = ' + fmt(row.p) + ' · 1/P = ' + fmt(1 / row.p) + '×</span>' +
+      '<button class="xbtn sim-del" data-i="' + i + '" title="Remove token">✕</button>';
+    host.appendChild(div);
+  });
+  host.querySelectorAll(".sim-name").forEach(function(el){
+    el.addEventListener("input", function(){ simRows[+el.dataset.i].name = el.value; updateSim(); });
+  });
+  host.querySelectorAll(".sim-range").forEach(function(el){
+    el.addEventListener("input", function(){
+      var i = +el.dataset.i;
+      simRows[i].p = +el.value / 100;
+      var row = el.parentElement;
+      row.querySelector(".sim-num").value = simRows[i].p.toFixed(2);
+      row.querySelector(".sim-p").textContent = "P = " + fmt(simRows[i].p) + " · 1/P = " + fmt(1 / simRows[i].p) + "×";
+      updateSim();
+    });
+  });
+  host.querySelectorAll(".sim-num").forEach(function(el){
+    el.addEventListener("input", function(){
+      var i = +el.dataset.i;
+      var v = parseFloat(el.value);
+      if (!(v > 0) || v > 1) return;
+      simRows[i].p = v;
+      var row = el.parentElement;
+      row.querySelector(".sim-range").value = Math.round(v * 100);
+      row.querySelector(".sim-p").textContent = "P = " + fmt(v) + " · 1/P = " + fmt(1 / v) + "×";
+      updateSim();
+    });
+  });
+  host.querySelectorAll(".sim-del").forEach(function(el){
+    el.addEventListener("click", function(){ simRows.splice(+el.dataset.i, 1); renderSimRows(); updateSim(); });
+  });
+}
+function updateSim(){
+  var rows = simRows.filter(function(r){ return r.name.trim() !== "" && r.p > 0 && r.p <= 1; });
+  if (rows.length === 0){
+    $("simOut").innerHTML = "<p class='muted'>Add a token with a probability between 0 and 1.</p>";
+    return;
+  }
+  var mapped = rows.map(function(r){ return {token: r.name, p: r.p}; });
+  var out = resultsHTML(mapped, "sim");
+  $("simOut").innerHTML = "<p class='muted'>Simulated, not from the model.</p>" + out.html;
+  animatePP($("pp-sim"), out.pp);
+}
+// ----- Arcade High Scores: every real-model score goes on the board -----
+var SCORE_KEY = "pxArcadeScores";
+var arcadeScores = [];
+function loadScores(){
+  try {
+    if (typeof localStorage === "undefined") return;
+    var raw = localStorage.getItem(SCORE_KEY);
+    if (raw) arcadeScores = JSON.parse(raw).slice(0, 50);
+  } catch (e){ arcadeScores = []; }
+}
+function saveScores(){
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(SCORE_KEY, JSON.stringify(arcadeScores.slice(0, 50)));
+  } catch (e){}
+}
+function logScore(sentence, pp){
+  arcadeScores.push({s: sentence, pp: pp});
+  if (arcadeScores.length > 50) arcadeScores = arcadeScores.slice(-50);
+  saveScores();
+  renderHighScores();
+}
+function scoreItem(s, pp){
+  return '<li><span>' + escapeHtml(s.length > 42 ? s.slice(0, 41) + "…" : s) + '</span><b>' + fmt(pp) + '</b></li>';
+}
+function renderHighScores(){
+  var fame = arcadeScores.slice().sort(function(a, b){ return a.pp - b.pp; }).slice(0, 5);
+  var shame = arcadeScores.slice().sort(function(a, b){ return b.pp - a.pp; }).slice(0, 5);
+  $("fameList").innerHTML = fame.length ? fame.map(function(x){ return scoreItem(x.s, x.pp); }).join("") : "<li>No scores yet — go score a sentence above.</li>";
+  $("shameList").innerHTML = shame.length ? shame.map(function(x){ return scoreItem(x.s, x.pp); }).join("") : "<li>No scores yet — try “Python love I”.</li>";
+  $("scoreCount").textContent = arcadeScores.length ? "(" + arcadeScores.length + " sentences on the board)" : "";
+}
+// ----- Sentence showdown -----
+async function runShowdown(){
+  var a = $("sA").value.trim(), b = $("sB").value.trim();
+  if (!a || !b){
+    $("showStatus").textContent = "Type both sentences first.";
+    $("showStatus").className = "status err";
+    return;
+  }
+  if (!window.__pxScore){
+    $("showStatus").textContent = "The model library is still loading — check your connection and try again.";
+    $("showStatus").className = "status err";
+    return;
+  }
+  $("showStatus").textContent = "Scoring both sentences…";
+  $("showStatus").className = "status";
+  try {
+    await window.__pxEnsure();
+    var ra = await window.__pxScore(a);
+    var rb = await window.__pxScore(b);
+    logScore(a, ra.pp);
+    logScore(b, rb.pp);
+    var oa = resultsHTML(ra.rows, "showA");
+    var ob = resultsHTML(rb.rows, "showB");
+    var winner = oa.pp <= ob.pp ? "A" : "B";
+    $("showOut").innerHTML =
+      '<div class="winner">🏆 Sentence ' + winner + ' wins — perplexity ' + fmt(Math.min(oa.pp, ob.pp)) +
+      ' vs ' + fmt(Math.max(oa.pp, ob.pp)) + '</div>' +
+      '<div class="vs"><div><h3>Sentence A · PP ' + fmt(oa.pp) + '</h3>' + oa.html + '</div>' +
+      '<div class="mid">VS</div><div><h3>Sentence B · PP ' + fmt(ob.pp) + '</h3>' + ob.html + '</div></div>';
+    animatePP($("pp-showA"), oa.pp);
+    animatePP($("pp-showB"), ob.pp);
+    $("showStatus").textContent = "";
+  } catch (e){
+    $("showStatus").textContent = "Could not score — " + (e && e.message ? e.message : "model error");
+    $("showStatus").className = "status err";
+  }
+}
+// ----- Guess the perplexity -----
+var GUESS_POOL = [
+  "The cat sat on the mat",
+  "I love Python",
+  "The capital of France is Paris",
+  "Hello, how are you today?",
+  "Colorless green ideas sleep furiously",
+  "The dog barked at the moon",
+  "Quantum entanglement violates local realism",
+  "The banana danced on the purple roof",
+  "She sells seashells by the seashore",
+  "To be or not to be, that is the question"
+];
+var guessCurrent = null, guessCorrect = 0, guessTotal = 0, guessRevealed = false;
+function guessRange(pp){ if (pp < 2) return 0; if (pp < 5) return 1; if (pp < 20) return 2; return 3; }
+function newGuess(){
+  guessCurrent = GUESS_POOL[Math.floor(Math.random() * GUESS_POOL.length)];
+  guessRevealed = false;
+  $("guessSentence").textContent = "“" + guessCurrent + "”";
+  $("guessStatus").textContent = "Now guess — which range is its perplexity in?";
+  $("guessStatus").className = "status";
+  $("guessOut").innerHTML = "";
+}
+async function doGuess(r){
+  if (!guessCurrent || guessRevealed) return;
+  if (!window.__pxScore){
+    $("guessStatus").textContent = "The model library is still loading — check your connection and try again.";
+    $("guessStatus").className = "status err";
+    return;
+  }
+  $("guessStatus").textContent = "Asking the model…";
+  $("guessStatus").className = "status";
+  try {
+    await window.__pxEnsure();
+    var res = await window.__pxScore(guessCurrent);
+    logScore(guessCurrent, res.pp);
+    var actual = guessRange(res.pp);
+    guessTotal++;
+    var ok = actual === r;
+    if (ok) guessCorrect++;
+    guessRevealed = true;
+    $("guessScore").textContent = "Score: " + guessCorrect + " / " + guessTotal;
+    var ranges = ["PP 1 – 2", "PP 2 – 5", "PP 5 – 20", "PP 20+"];
+    var out = resultsHTML(res.rows, "guess");
+    $("guessOut").innerHTML =
+      '<p style="font-size:19px;font-weight:700">' + (ok ? "🎉 You got it!" : "😅 Not this time — the real range was " + ranges[actual] + ".") + '</p>' + out.html;
+    animatePP($("pp-guess"), out.pp);
+    $("guessStatus").textContent = "Hit “New sentence” for another round.";
+  } catch (e){
+    $("guessStatus").textContent = "Could not score — " + (e && e.message ? e.message : "model error");
+    $("guessStatus").className = "status err";
+  }
+}
+// ----- Surprise Me -----
+var SURPRISE_POOL = [
+  {s:"Colorless green ideas sleep furiously", why:"Chomsky's famous nonsense — perfect grammar, zero sense."},
+  {s:"Buffalo buffalo Buffalo buffalo buffalo buffalo Buffalo buffalo", why:"A real sentence made of one word, eight times."},
+  {s:"The quick brown fox jumps over the lazy dog", why:"The classic pangram — every letter of the alphabet."},
+  {s:"I love Python", why:"Simple and fluent — but watch the model stumble on “Python”."},
+  {s:"Python love I", why:"Same words, scrambled order — the model's nightmare."},
+  {s:"The mitochondria is the powerhouse of the cell", why:"Every biology student knows this one by heart."},
+  {s:"To be or not to be, that is the question", why:"Shakespeare — the model has seen this a million times."},
+  {s:"She sells seashells by the seashore", why:"A tongue twister the model has to sound out token by token."},
+  {s:"Supercalifragilisticexpialidocious", why:"One giant word — watch the tokenizer chop it up."},
+  {s:"The the the the the", why:"Five “the”s in a row. The model hates this."}
+];
+function surpriseMe(){
+  var pick = SURPRISE_POOL[Math.floor(Math.random() * SURPRISE_POOL.length)];
+  $("sentence").value = pick.s;
+  $("surpriseNote").textContent = pick.why;
+  if (window.__pxRun) window.__pxRun();
+}
+// ----- Target Practice: land the perplexity inside the band -----
+var TARGET_BANDS = [
+  {label:"PP 1 – 5", low:1, high:5},
+  {label:"PP 5 – 20", low:5, high:20},
+  {label:"PP 20 – 100", low:20, high:100},
+  {label:"PP 100 – 500", low:100, high:500},
+  {label:"PP 500+", low:500, high:10000}
+];
+var targetBand = TARGET_BANDS[2];
+var targetWon = 0, targetAttempts = 0, targetDone = false;
+function meterPct(pp){
+  return Math.max(0, Math.min(100, Math.log10(Math.max(1, pp)) / 4 * 100));
+}
+function newTarget(){
+  targetBand = TARGET_BANDS[Math.floor(Math.random() * TARGET_BANDS.length)];
+  targetDone = false; targetAttempts = 0;
+  $("targetBand").textContent = targetBand.label;
+  var bandEl = $("targetBandMark");
+  bandEl.style.left = meterPct(targetBand.low) + "%";
+  bandEl.style.width = (meterPct(targetBand.high) - meterPct(targetBand.low)) + "%";
+  $("targetMark").style.left = "50%";
+  $("targetVerdict").textContent = "Target: " + targetBand.label + " — type a sentence, then hit “Score it”.";
+  $("targetVerdict").className = "status";
+}
+async function scoreTarget(){
+  var text = $("targetInput").value.trim();
+  if (!text || targetDone) return;
+  if (!window.__pxScore){
+    $("targetVerdict").textContent = "The model library is still loading — check your connection and try again.";
+    $("targetVerdict").className = "status err";
+    return;
+  }
+  $("targetVerdict").textContent = "Scoring…";
+  $("targetVerdict").className = "status";
+  try {
+    await window.__pxEnsure();
+    var res = await window.__pxScore(text);
+    logScore(text, res.pp);
+    targetAttempts++;
+    $("targetMark").style.left = meterPct(res.pp) + "%";
+    if (res.pp >= targetBand.low && res.pp < targetBand.high){
+      targetDone = true; targetWon++;
+      $("targetScore").textContent = "🎯 Targets hit: " + targetWon;
+      $("targetVerdict").textContent = "🎯 HIT in " + targetAttempts + (targetAttempts === 1 ? " try! " : " tries! ") + "“" + text + "” scored " + fmt(res.pp) + " — inside " + targetBand.label + ".";
+      $("targetVerdict").className = "status ok";
+    } else {
+      var dir = res.pp < targetBand.low ? "Too smooth — " : "Too wild — ";
+      var hint = res.pp < targetBand.low ? "add a surprising word." : "make it more ordinary.";
+      $("targetVerdict").textContent = dir + "PP " + fmt(res.pp) + " (attempt " + targetAttempts + "). " + hint;
+      $("targetVerdict").className = "status";
+    }
+  } catch (e){
+    $("targetVerdict").textContent = "Could not score — " + (e && e.message ? e.message : "model error");
+    $("targetVerdict").className = "status err";
+  }
+}
+// ----- Present mode: guided tour -----
+var TOUR = [
+  {sel:"heroTitle", note:"Welcome to the Arcade. Perplexity is how surprised a language model is by a sentence — low means “seen it a thousand times”, high means “never in a million years”."},
+  {sel:"labCard", note:"The Live Model Lab: DistilGPT-2 runs in the browser and scores every token. First load takes a moment (about an 80 MB download), then it is instant."},
+  {sel:"skyCard", note:"The Surprise Skyline: each token is a building. Taller means the model found it more shocking — drawn live from the real result."},
+  {sel:"scoresCard", note:"Arcade High Scores: every sentence you score goes on the board — smoothest in the Hall of Fame, wildest in the Hall of Shame. It remembers your scores between visits."},
+  {sel:"showCard", note:"Sentence Showdown: the same model scores two sentences head to head. Lower perplexity wins."},
+  {sel:"guessCard", note:"Guess the Perplexity: can you feel surprise before the model does? Four ranges, one real answer."},
+  {sel:"targetCard", note:"Target Practice: the arcade challenge. A perplexity band is set — write a sentence that lands inside it. Too smooth and you are under, too wild and you are over."},
+  {sel:"simCard", note:"Try It by Hand: be the model. Set probabilities yourself and watch the maths move — no model needed, works offline."},
+  {sel:"howCard", note:"And the maths behind it all: the weighted die, 1/P, the N-th root, cross-entropy — plus the glossary and FAQ."}
+];
+var tourIdx = -1, tourEl = null;
+function tourGo(i){
+  if (tourEl) tourEl.classList.remove("tour-hl");
+  tourIdx = Math.max(0, Math.min(TOUR.length - 1, i));
+  tourEl = $(TOUR[tourIdx].sel);
+  if (tourEl){
+    tourEl.classList.add("tour-hl");
+    tourEl.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+  $("presentNote").textContent = TOUR[tourIdx].note;
+  $("presentCount").textContent = "Stop " + (tourIdx + 1) + " / " + TOUR.length;
+  $("presentBar").classList.add("on");
+}
+function tourExit(){
+  if (tourEl) tourEl.classList.remove("tour-hl");
+  tourEl = null; tourIdx = -1;
+  $("presentBar").classList.remove("on");
+}
+// ----- Wire everything up -----
+document.querySelectorAll(".sample").forEach(function(b){
+  b.addEventListener("click", function(){
+    $("sentence").value = b.dataset.s;
+    $("surpriseNote").textContent = "";
+    if (window.__pxRun) window.__pxRun();
+  });
+});
+$("surpriseBtn").addEventListener("click", surpriseMe);
+$("runBtn").addEventListener("click", function(){ if (window.__pxRun) window.__pxRun(); });
+$("showBtn").addEventListener("click", runShowdown);
+$("guessNewBtn").addEventListener("click", newGuess);
+document.querySelectorAll(".guess-range").forEach(function(b){
+  b.addEventListener("click", function(){ doGuess(+b.dataset.r); });
+});
+document.querySelectorAll(".sim-preset").forEach(function(b){
+  b.addEventListener("click", function(){
+    simRows = SIM_PRESETS[b.dataset.p].map(function(r){ return {name:r.name, p:r.p}; });
+    renderSimRows(); updateSim();
+  });
+});
+$("addSimBtn").addEventListener("click", function(){
+  simRows.push({name:"token" + (simRows.length + 1), p:0.5});
+  renderSimRows(); updateSim();
+});
+$("presentBtn").addEventListener("click", function(){ tourGo(0); });
+$("tourNext").addEventListener("click", function(){ if (tourIdx >= TOUR.length - 1) tourExit(); else tourGo(tourIdx + 1); });
+$("tourPrev").addEventListener("click", function(){ tourGo(tourIdx - 1); });
+$("tourExit").addEventListener("click", tourExit);
+document.addEventListener("keydown", function(e){
+  if (!$("presentBar").classList.contains("on")) return;
+  if (e.key === "ArrowRight") tourGo(tourIdx + 1);
+  if (e.key === "ArrowLeft") tourGo(tourIdx - 1);
+  if (e.key === "Escape") tourExit();
+});
+// Live scoring: once the model is ready, score as you type (debounced).
+var liveTimer = null;
+$("sentence").addEventListener("input", function(){
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(function(){
+    if (window.__pxModelReady && window.__pxRun) window.__pxRun();
+  }, 800);
+});
+$("clearScoresBtn").addEventListener("click", function(){
+  arcadeScores = [];
+  saveScores();
+  renderHighScores();
+});
+$("targetNewBtn").addEventListener("click", newTarget);
+$("targetBtn").addEventListener("click", scoreTarget);
+$("targetInput").addEventListener("keydown", function(e){ if (e.key === "Enter") scoreTarget(); });
+loadScores();
+renderHighScores();
+newTarget();
+// Watchdog: if the model library never loads, say so plainly.
+setTimeout(function(){
+  if (!window.__pxModuleOK){
+    setStatus("Could not load the model library — check your internet connection, then refresh. The hand simulator below still works.", true);
+  }
+}, 8000);
+renderSimRows();
+updateSim();
+// Shared with the module script below.
+window.PX = {renderResults: resultsHTML, setStatus: setStatus, showToken: showToken,
+  fmt: fmt, ppOf: ppOf, verdictFor: verdictFor, drawSkyline: drawSkyline, animatePP: animatePP, logScore: logScore};
+</script>
+
+<script type="module">
+// ===== Module script: the real model =====
+// Loads Transformers.js from the CDN and runs DistilGPT-2 (q8)
+// entirely in the browser. If this import fails, the classic
+// script above keeps working (simulator, games, tour).
+const PX = window.PX;
+// The module script itself executed, so the watchdog in the classic
+// script must not fire while the library is still downloading.
+window.__pxModuleOK = true;
+const MODEL_ID = "Xenova/distilgpt2";
+const START_TOKEN_ID = 50256;
+let AutoTokenizer = null, AutoModelForCausalLM = null, Tensor = null;
+let tokenizer = null, model = null;
+let modelReady = false;
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+async function loadLibrary(){
+  if (AutoTokenizer) return true;
+  try {
+    const lib = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3");
+    AutoTokenizer = lib.AutoTokenizer;
+    AutoModelForCausalLM = lib.AutoModelForCausalLM;
+    Tensor = lib.Tensor;
+    window.__pxModuleOK = true;
+    return true;
+  } catch (e){
+    PX.setStatus("Could not load the model library — check your internet connection, then refresh. The hand simulator below still works.", true);
+    return false;
+  }
+}
+// Stable softmax of one row of logits, in log space.
+function logSoftmaxRow(data, offset, V){
+  let m = -Infinity;
+  for (let j = 0; j < V; j++){ const v = data[offset + j]; if (v > m) m = v; }
+  let s = 0;
+  for (let j = 0; j < V; j++) s += Math.exp(data[offset + j] - m);
+  const logS = m + Math.log(s);
+  const out = new Float64Array(V);
+  for (let j = 0; j < V; j++) out[j] = Math.exp(data[offset + j] - logS);
+  return out;
+}
+async function loadModel(){
+  if (modelReady) return true;
+  if (!await loadLibrary()) return false;
+  try {
+    PX.setStatus("Downloading the model… (first time only, ~80 MB)");
+    tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID);
+    model = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
+      dtype: "q8",
+      progress_callback: (p) => {
+        if (p && p.file && p.file.endsWith(".onnx")){
+          PX.setStatus("Downloading the model… " + Math.round((p.progress || 0) * 100) + "%");
+        }
+      }
+    });
+    modelReady = true;
+    window.__pxModelReady = true;
+    PX.setStatus("Model ready ✓ — type a sentence and it scores live.", false);
+    document.getElementById("status").className = "status ok";
+    return true;
+  } catch (e){
+    PX.setStatus("The model failed to load: " + (e && e.message ? e.message : "unknown error") + ". The hand simulator below still works.", true);
+    return false;
+  }
+}
+// Score one sentence: per-token probabilities + last-position distribution.
+async function scoreSentence(text){
+  await loadModel();
+  if (!modelReady) throw new Error("model not ready");
+  const ids = [START_TOKEN_ID, ...tokenizer.encode(text)];
+  const inputIds = new Tensor("int64", BigInt64Array.from(ids.map(BigInt)), [1, ids.length]);
+  const attentionMask = new Tensor("int64", BigInt64Array.from(ids.map(() => 1n)), [1, ids.length]);
+  const out = await model({input_ids: inputIds, attention_mask: attentionMask});
+  const logits = out.logits;
+  const V = logits.dims[2];
+  const data = logits.data;
+  const rows = [];
+  for (let t = 1; t < ids.length; t++){
+    const probs = logSoftmaxRow(data, (t - 1) * V, V);
+    rows.push({token: tokenizer.decode([ids[t]]), p: probs[ids[t]]});
+  }
+  const lastProbs = logSoftmaxRow(data, (ids.length - 1) * V, V);
+  return {rows, pp: PX.ppOf(rows), lastProbs, V};
+}
+function top8(lastProbs, V){
+  const idx = Array.from({length: V}, (_, i) => i);
+  idx.sort((a, b) => lastProbs[b] - lastProbs[a]);
+  return idx.slice(0, 8).map(i => ({id: i, p: lastProbs[i]}));
+}
+async function run(){
+  const text = document.getElementById("sentence").value.trim();
+  if (!text){ PX.setStatus("Type a sentence first.", true); return; }
+  const t0 = performance.now();
+  if (!await loadModel()) return;
+  try {
+    PX.setStatus("Scoring…");
+    const res = await scoreSentence(text);
+    const ms = Math.round(performance.now() - t0);
+    const out = PX.renderResults(res.rows, "real");
+    document.getElementById("realOut").innerHTML = out.html +
+      '<p class="muted">Computed by DistilGPT-2 in your browser · ' + res.rows.length +
+      ' tokens · took ' + ms + ' ms</p>';
+    document.getElementById("realCard").classList.remove("hidden");
+    PX.animatePP(document.getElementById("pp-real"), out.pp);
+    PX.drawSkyline(res.rows);
+    PX.logScore(text, out.pp);
+    const top = top8(res.lastProbs, res.V);
+    const maxP = top[0].p;
+    const bars = top.map((t, i) => {
+      const name = t.id === START_TOKEN_ID ? "⏹ end of text" : PX.showToken(tokenizer.decode([t.id]));
+      const w = Math.max(2, (t.p / maxP) * 100);
+      return '<div style="display:flex;align-items:center;gap:10px;margin:7px 0">' +
+        '<span class="num" style="min-width:130px">' + esc(name) + '</span>' +
+        '<div class="barwrap" style="flex:1"><div class="bar" style="width:' + w.toFixed(1) + '%"></div></div>' +
+        '<span class="num" style="min-width:64px;text-align:right">' + (t.p * 100).toFixed(1) + '%</span>' +
+        (i === 0 ? '<span class="badge good" style="margin:0">TOP PICK</span>' : '') + '</div>';
+    }).join("");
+    document.getElementById("nextOut").innerHTML = bars;
+    document.getElementById("nextCard").classList.remove("hidden");
+    PX.setStatus("Model ready ✓ — type a sentence and it scores live.", false);
+    document.getElementById("status").className = "status ok";
+  } catch (e){
+    PX.setStatus("Could not score — " + (e && e.message ? e.message : "model error"), true);
+  }
+}
+window.__pxRun = run;
+window.__pxScore = scoreSentence;
+window.__pxEnsure = loadModel;
+</script>
+</body>
+</html>
